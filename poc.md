@@ -60,13 +60,13 @@ Gatling verwendet das Konzept von virtuellen Usern anstatt einfachen Anfragen. D
 ### Auslastungsrate
 Es gibt unterschiedliche Methoden mit welchen Gatling die Rate an virtuellen Benutzer vorgibt, wobei diese ebenso miteinander verkettet werden können. Es wird unterschieden in eine konstante Benutzeranzahl, stetig steigende Benutzer oder pro Sekunde immer größer werdende Zunahmerate:
 
-* ``atOnceUsers(10)`` *einmalig 10 Benutzer*
-* ``rampUsers(10).during(30)`` *10 Benutzer während 30 Sekunden*
-* ``constantUsersPerSec(10).during(30)`` *pro Sekunde 10 neue Benutzer für 30 Sekunden*
-* ``rampUsersPerSec(10).to(20).during(30)`` *pro Sekunde zwischen 10 und 20 neue Benutzer für 30 Sekunden*
+* ``atOnceUsers(10)`` einmalig 10 Benutzer
+* ``rampUsers(10).during(30)`` 10 Benutzer während 30 Sekunden
+* ``constantUsersPerSec(10).during(30)`` pro Sekunde 10 neue Benutzer für 30 Sekunden
+* ``rampUsersPerSec(10).to(20).during(30)`` pro Sekunde zwischen 10 und 20 neue Benutzer für 30 Sekunden
 
 ## Geräte und Browser
-Es besteht die Möglichkeit spezifische Header für die Requests festzulegen. Hiermit kann man User-Agents einzusetzen, um so bestimmte Geräte oder Browser zu simulieren. Dadurch, dass hier nur ein Header verwendet wird, sollte dies standardmäßig nicht die Geschwindigkeit beeinfluss, da die erhaltenen Daten nicht gerendet werden.
+Es besteht die Möglichkeit spezifische Header für die Requests festzulegen. Hiermit kann man User-Agents einsetzen, um so bestimmte Geräte oder Browser zu simulieren. Dadurch, dass hier nur ein Header verwendet wird, sollte dies standardmäßig nicht die Geschwindigkeit beeinfluss, da die erhaltenen Daten nicht gerendet werden.
 
 ```java
 http
@@ -78,21 +78,21 @@ http
 ```
 
 ## Nutzerverhalten/Parametrisierung
-Mittels sogenannten Feedern können Daten eingelesen und in Anfragen verwendet werden. Diese Feeder können Daten von csv-Dateien, hard-kodiertem Code oder Funktionen entgegennehmen und basieren auf einem Key-Value-Store. Ebenso können Daten aus Requests extrahiert und zwischengespeichert werden. Damit ist es ebenso möglich ein Szenario zu erstellen in welchem mehrere virtuelle User unterschiedliche Daten verwenden oder eine eigene Authentifizierung verwenden und diverse API-Keys oder Token in darauffolgenden Anfragen verwenden.
+Mittels sogenannten Feedern können Daten eingelesen und in Anfragen verwendet werden. Diese Feeder können Daten von csv-Dateien, hard-kodiertem Code oder Funktionen entgegennehmen und basieren auf einem Key-Value-Store. Ebenso können Daten aus Requests extrahiert und zwischengespeichert werden. Damit ist es möglich ein Szenario zu erstellen in welchem mehrere virtuelle User unterschiedliche Daten oder eine eigene Authentifizierung verwenden und diverse API-Keys oder Token in darauffolgenden Anfragen zurücksenden.
 
 ```java
 Iterator<Map<String, Object>> feeder =
     Stream.generate((Supplier<Map<String, Object>>) () -> new HashMap<>() {{
-        put("username", RandomStringUtils.randomAlphanumeric(5, 6));
-        put("password", RandomStringUtils.randomAlphanumeric(10, 15));
+        put("username", RandomStringUtils.randomAlphanumeric(5, 6)); // generate random username
+        put("password", RandomStringUtils.randomAlphanumeric(10, 15)); // generate random password
     }}).iterator();
 
-scenario("Default scenario")
+scenario("Example scenario")
     .feed(feeder)
     .exec(http("Authentication request")
         .post("/api/public/authenticate")
         .asJson()
-        .body(StringBody("{\"username\":\"#{username}\",\"password\":\"#{password}\"}"))
+        .body(StringBody("{\"username\":\"#{username}\",\"password\":\"#{password}\"}")) // use data from feeder
         .check(header("Authorization").saveAs("jwt")) // save authentication token
         .check(status().is(200)))
     .exec(http("Request private resource")
