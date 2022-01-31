@@ -51,6 +51,55 @@ Standalone-Tool, welches ebenso eine Cloud-Version in einem Subscription-Modell 
 #### Gatling
 Standalone-Tool, welches auch eine kostenpflichtige Enterprise Version basierend auf einem Subscription-Modell anbietet. Diese kann aber auch selbst gehostet und muss nicht in deren Cloud ausgelagert werden. Tests werden in Java, Kotlin oder Scala erstellt und sind leicht durch ein Maven-Plugin in eine CI/CD Pipeline zu integrieren. Generiert Reports in Form von HTML-Dokumenten. Skalierbar mit der Enterprise Version oder manuell via Skripts.
 
+## Gatling
+Dieser Abschnitt wird verwendet, um auszuführen welche Aspekte für mehr realistisches Load Testing Gatling erfüllt und wie diese implementiert sind.
+
+### Konzept
+Gatling verwendet das Konzept von virtuellen Usern anstatt einfachen Anfragen. Diese User lösen ein Szenario aus, welches diverse Anfragen enthalten kann. Jede Anfrage kann unterschiedliche Bedingungen enthalten, worauf der Test fehlschlägt oder erfoglreich durchgeführt wird.
+
+### Auslastungsrate
+Es gibt unterschiedliche Methoden mit welchen Gatling die Rate an virtuellen Benutzer vorgibt, wobei diese ebenso miteinander verkettet werden können. Es wird unterschieden in eine konstante Benutzeranzahl, stetig steigende Benutzer oder pro Sekunde immer größer werdende Zunahmerate:
+
+* ``atOnceUsers(10)`` *einmalig 10 Benutzer*
+* ``rampUsers(10).during(30)`` *10 Benutzer während 30 Sekunden*
+* ``constantUsersPerSec(10).during(30)`` *pro Sekunde 10 neue Benutzer für 30 Sekunden*
+* ``rampUsersPerSec(10).to(20).during(30)`` *pro Sekunde zwischen 10 und 20 neue Benutzer für 30 Sekunden*
+
+## Geräte und Browser
+Es besteht die Möglichkeit spezifische Header für die Requests festzulegen. Hiermit kann man User-Agents einzusetzen, um so bestimmte Geräte oder Browser zu simulieren. Dadurch, dass hier nur ein Header verwendet wird, sollte dies standardmäßig nicht die Geschwindigkeit beeinfluss, da die erhaltenen Daten nicht gerendet werden.
+
+```java
+http
+    .baseUrl("http://localhost:8080")
+    .acceptHeader("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
+    .acceptEncodingHeader("gzip, deflate, br")
+    .acceptLanguageHeader("en-US,en;q=0.9")
+    .userAgentHeader("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36");
+```
+
+## Nutzerverhalten/Parametrisierung
+Mittels sogenannten Feedern können Daten eingelesen und in Anfragen verwendet werden. Diese Feeder können Daten von csv-Dateien, hard-kodiertem Code oder Funktionen entgegennehmen und basieren auf einem Key-Value-Store. Ebenso können Daten aus Requests extrahiert und zwischengespeichert werden. Damit ist es ebenso möglich ein Szenario zu erstellen in welchem mehrere virtuelle User unterschiedliche Daten verwenden oder eine eigene Authentifizierung verwenden und diverse API-Keys oder Token in darauffolgenden Anfragen verwenden.
+
+```java
+Iterator<Map<String, Object>> feeder =
+    Stream.generate((Supplier<Map<String, Object>>) () -> new HashMap<>() {{
+        put("username", RandomStringUtils.randomAlphanumeric(5, 6));
+        put("password", RandomStringUtils.randomAlphanumeric(10, 15));
+    }}).iterator();
+
+scenario("Default scenario")
+    .feed(feeder)
+    .exec(http("Authentication request")
+        .post("/api/public/authenticate")
+        .asJson()
+        .body(StringBody("{\"username\":\"#{username}\",\"password\":\"#{password}\"}"))
+        .check(header("Authorization").saveAs("jwt")) // save authentication token
+        .check(status().is(200)))
+    .exec(http("Request private resource")
+        .get("/api/private").check(status().is(200))
+        .header("Authorization", "Bearer #{jwt}")); // use previously saved authentication token
+```
+
 ## Quellen
 * [https://loadium.com/blog/5-steps-to-create-a-realistic-load-test](https://loadium.com/blog/5-steps-to-create-a-realistic-load-test)
 * [https://loadninja.com/articles/must-do-strategies-for-realistic-load-tests](https://loadninja.com/articles/must-do-strategies-for-realistic-load-tests)
